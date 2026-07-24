@@ -1,0 +1,10 @@
+# Dependencies and generated files
+node_modules/
+dist/
+.angular/
+out-tsc/
+
+# System and editor files
+.DS_Store
+Thumbs.db
+.vscode/
