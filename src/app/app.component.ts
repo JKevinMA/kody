@@ -6,7 +6,7 @@ import { LucideDynamicIcon, LucideDownload, LucideFlashlight, LucidePackage, Luc
 import { CatalogService } from './catalog.service';
 import { Product, ProductPresentation } from './product.model';
 
-interface PresentationDraft { name: string; units: number | null; priceInput: string; unitsTouched: boolean; priceTouched: boolean; }
+interface PresentationDraft { name: string; customName: boolean; units: number | null; priceInput: string; unitsTouched: boolean; priceTouched: boolean; }
 interface ProductDraft { barcode: string; name: string; tags: string[]; image?: string; presentations: PresentationDraft[]; }
 
 @Component({ selector: 'app-root', standalone: true, imports: [CommonModule, FormsModule, LucideDynamicIcon], providers: [provideLucideIcons(LucideDownload, LucideFlashlight, LucidePackage, LucidePlus, LucideScanBarcode, LucideSearch, LucideUpload, LucideX)], templateUrl: './app.component.html' })
@@ -41,8 +41,9 @@ export class AppComponent implements OnInit, OnDestroy {
     } catch { this.stopScanner(); this.message='No se pudo abrir la cámara. Revisa sus permisos.'; }
   }
   async setFlash(on:boolean) { if (!this.scanner?.switchTorch) return; try { await this.scanner.switchTorch(on); this.flashOn=on; } catch { this.flashAvailable=false; this.flashOn=false; } }
-  addPresentation() { this.draft.presentations.push({name:'',units:1,priceInput:'0.00',unitsTouched:false,priceTouched:false}); }
+  addPresentation() { this.draft.presentations.push({name:'Unidad',customName:false,units:1,priceInput:'0.00',unitsTouched:false,priceTouched:false}); }
   removePresentation(index:number) { if(this.draft.presentations.length > 1) this.draft.presentations.splice(index,1); }
+  selectPresentationName(presentation:PresentationDraft, name:string) { presentation.customName=name==='__custom__'; if (!presentation.customName) presentation.name=name; else presentation.name=''; }
   clearInitialPrice(presentation:PresentationDraft) { if(!presentation.priceTouched && presentation.priceInput==='0.00') presentation.priceInput=''; presentation.priceTouched=true; }
   clearInitialUnits(presentation:PresentationDraft) { if(!presentation.unitsTouched && presentation.units===1) presentation.units=null; presentation.unitsTouched=true; }
   formatPresentationPrice(presentation:PresentationDraft) { const amount=Number(presentation.priceInput.replace(',', '.')); presentation.priceInput=Number.isFinite(amount) ? amount.toFixed(2) : '0.00'; }
@@ -62,5 +63,5 @@ export class AppComponent implements OnInit, OnDestroy {
   private async refreshProducts() { this.products=(await this.catalog.all()).sort((a,b) => a.name.localeCompare(b.name)); }
   private async refreshSuggestedTags() { this.suggestedTags=[...new Set((await this.catalog.all()).flatMap(product => product.tags))].sort((a,b) => a.localeCompare(b)); }
   private normaliseProduct(value:unknown):Product | undefined { if(!value || typeof value !== 'object') return; const source=value as Partial<Product>; if(typeof source.barcode !== 'string' || typeof source.name !== 'string' || !source.barcode.trim() || !source.name.trim()) return; const legacyPrice=Number(source.price); const sourcePresentations=Array.isArray(source.presentations) ? source.presentations : []; const presentations=sourcePresentations.map(p => ({name:typeof p?.name==='string' && p.name.trim() ? p.name.trim() : 'Unidad',units:Math.max(1,Number(p?.units)||1),price:Number(p?.price)})).filter(p => Number.isFinite(p.price) && p.price>0); if(!presentations.length && Number.isFinite(legacyPrice) && legacyPrice>0) presentations.push({name:'Unidad',units:1,price:legacyPrice}); if(!presentations.length) return; return {barcode:source.barcode.trim(),name:source.name.trim(),price:presentations[0].price,presentations,tags:Array.isArray(source.tags) ? source.tags.filter((tag):tag is string => typeof tag==='string' && Boolean(tag.trim())) : [],image:typeof source.image==='string' ? source.image : undefined,updatedAt:Date.now()}; }
-  private empty(barcode=''):ProductDraft { return {barcode,name:'',tags:[],presentations:[{name:'Unidad',units:1,priceInput:'0.00',unitsTouched:false,priceTouched:false}]}; }
+  private empty(barcode=''):ProductDraft { return {barcode,name:'',tags:[],presentations:[{name:'Unidad',customName:false,units:1,priceInput:'0.00',unitsTouched:false,priceTouched:false}]}; }
 }
