@@ -8,12 +8,13 @@ import { Product } from './product.model';
 @Component({ selector: 'app-root', standalone: true, imports: [CommonModule, FormsModule], templateUrl: './app.component.html' })
 export class AppComponent implements OnInit, OnDestroy {
   tab = signal<'search'|'register'>('search'); query=''; results:Product[]=[]; recent:Product[]=[]; selected?:Product; message=''; scanning=false; draft=this.empty();
+  priceInput='0.00'; tagInput=''; suggestedTags:string[]=[];
   private scanner?: IScannerControls;
   constructor(private catalog:CatalogService) {}
-  async ngOnInit() { await this.catalog.init(); this.recent=await this.catalog.recent(); }
+  async ngOnInit() { await this.catalog.init(); this.recent=await this.catalog.recent(); await this.refreshSuggestedTags(); }
   ngOnDestroy() { this.stopScanner(); }
   async find() { this.results=this.query.trim()?await this.catalog.search(this.query.trim()):[]; }
-  async lookup(code:string) { const p=await this.catalog.byBarcode(code); if(p){ this.selected=p; this.recent=await this.catalog.recent(); navigator.vibrate?.(80); } else { this.message=`No encontramos el código ${code}. Regístralo a continuación.`; this.draft=this.empty(code); this.tab.set('register'); } }
+  async lookup(code:string) { const p=await this.catalog.byBarcode(code); if(p){ this.selected=p; this.recent=await this.catalog.recent(); navigator.vibrate?.(80); } else { this.message=`No encontramos el código ${code}. Regístralo a continuación.`; this.draft=this.empty(code); this.priceInput='0.00'; this.tab.set('register'); } }
   async scan(target:'search'|'register') {
     this.tab.set(target);
     this.message='';
@@ -36,7 +37,7 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     try {
-      const reader=new BrowserMultiFormatReader();
+      const reader=new BrowserMultiFormatReader(undefined, { delayBetweenScanAttempts: 100, delayBetweenScanSuccess: 100 });
       reader.possibleFormats=[BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.CODE_128, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E];
       this.scanner=await reader.decodeFromConstraints(
         { video: { facingMode: { ideal: 'environment' } }, audio: false },
@@ -53,8 +54,13 @@ export class AppComponent implements OnInit, OnDestroy {
       this.message='No se pudo abrir la cámara. Revisa sus permisos.';
     }
   }
-  async save() { if(!this.draft.barcode || !this.draft.name || !this.draft.price){this.message='Completa código, nombre y precio.';return;} this.draft.tags=this.draft.tags.filter(Boolean); this.draft.updatedAt=Date.now(); await this.catalog.save({...this.draft}); this.message='Producto guardado correctamente.'; this.draft=this.empty(); this.tab.set('search'); }
+  async save() { if(!this.draft.barcode || !this.draft.name || !this.draft.price){this.message='Completa código, nombre y precio.';return;} this.draft.tags=this.draft.tags.filter(Boolean); this.draft.updatedAt=Date.now(); await this.catalog.save({...this.draft}); await this.refreshSuggestedTags(); this.message='Producto guardado correctamente.'; this.draft=this.empty(); this.priceInput='0.00'; this.tagInput=''; this.tab.set('search'); }
   onImage(e:Event) { const f=(e.target as HTMLInputElement).files?.[0]; if(!f)return; const r=new FileReader(); r.onload=()=>this.draft.image=r.result as string; r.readAsDataURL(f); }
-  private stopScanner() { this.scanner?.stop(); this.scanner=undefined; this.scanning=false; }
-  private empty(barcode=''):Product { return {barcode,name:'',price:0,stock:0,tags:[],updatedAt:0}; }
+  updatePrice(value:string) { this.priceInput=value.replace(',', '.').replace(/[^0-9.]/g, ''); const amount=Number(this.priceInput); this.draft.price=Number.isFinite(amount) ? amount : 0; }
+  formatPrice() { this.priceInput=this.draft.price ? this.draft.price.toFixed(2) : '0.00'; }
+  addTag(value=this.tagInput) { const tag=value.trim(); if (!tag || this.draft.tags.some(item => item.toLowerCase() === tag.toLowerCase())) return; this.draft.tags.push(tag); this.tagInput=''; }
+  removeTag(tag:string) { this.draft.tags=this.draft.tags.filter(item => item !== tag); }
+  stopScanner() { this.scanner?.stop(); this.scanner=undefined; this.scanning=false; }
+  private async refreshSuggestedTags() { this.suggestedTags=[...new Set((await this.catalog.all()).flatMap(product => product.tags))].sort((a,b) => a.localeCompare(b)); }
+  private empty(barcode=''):Product { return {barcode,name:'',price:0,tags:[],updatedAt:0}; }
 }

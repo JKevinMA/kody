@@ -1,4 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@layer base { body { @apply bg-slate-50 text-ink antialiased; } button, input { -webkit-tap-highlight-color: transparent; } }
+@layer base { body { @apply bg-slate-50 text-ink antialiased; } button, input { -webkit-tap-highlight-color: transparent; } button { touch-action: manipulation; } }
+
+.scanner-guide { position: relative; width: min(100%, 340px); aspect-ratio: 1.75; border: 3px solid rgba(255,255,255,.95); border-radius: 1.25rem; box-shadow: 0 0 0 9999px rgba(0,0,0,.12), 0 0 32px rgba(16,185,129,.55); overflow: hidden; }
+.scanner-line { position: absolute; right: .75rem; left: .75rem; height: 3px; background: #5eead4; box-shadow: 0 0 14px #5eead4; animation: scan-line 1.7s ease-in-out infinite; }
+.scanner-bars { position: absolute; inset: 30% 16%; opacity: .38; background: repeating-linear-gradient(90deg, #fff 0 3px, transparent 3px 8px, #fff 8px 10px, transparent 10px 15px); }
+@keyframes scan-line { 0%, 100% { top: 12%; } 50% { top: 85%; } }
